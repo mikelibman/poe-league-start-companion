@@ -125,7 +125,7 @@ export function GemPlanModule() {
                     <td>
                       <CostEditor
                         cost={entry.cost}
-                        onChange={(cost) =>
+                        onSet={(cost) =>
                           setEntryCost(activePlan.id, entry.id, cost)
                         }
                       />
@@ -171,31 +171,30 @@ export function GemPlanModule() {
 // Wisdom, another an Orb of Chance — and isn't reference data the app
 // ships with, so it's entered manually the first time. Setting it here
 // teaches the shared per-gem price list (see GemPlanContext.setEntryCost),
-// so it auto-fills for this gem in every plan from then on.
+// so it auto-fills for this gem in every plan from then on. It's the
+// gem's real fixed price, not a per-plan guess, so once set it's locked —
+// this only renders inputs while the gem's price is still unknown.
 function CostEditor({
   cost,
-  onChange,
+  onSet,
 }: {
   cost: CurrencyCost | null;
-  onChange: (cost: CurrencyCost | null) => void;
+  onSet: (cost: CurrencyCost) => void;
 }) {
-  function handleTypeChange(currencyType: string) {
-    if (!currencyType) {
-      onChange(null);
-      return;
-    }
-    onChange({ currencyType, amount: cost?.amount ?? 1 });
-  }
+  const [currencyType, setCurrencyType] = useState("");
+  const [amount, setAmount] = useState(1);
 
-  function handleAmountChange(amountStr: string) {
-    if (!cost) return;
-    const amount = Number(amountStr);
-    onChange({ currencyType: cost.currencyType, amount: Number.isFinite(amount) ? amount : 0 });
+  if (cost) {
+    return (
+      <span>
+        {cost.amount} × {cost.currencyType}
+      </span>
+    );
   }
 
   return (
     <div className="row-buttons">
-      <select value={cost?.currencyType ?? ""} onChange={(e) => handleTypeChange(e.target.value)}>
+      <select value={currencyType} onChange={(e) => setCurrencyType(e.target.value)}>
         <option value="">—</option>
         {POE_CURRENCY_TYPES.map((currency) => (
           <option key={currency} value={currency}>
@@ -203,15 +202,19 @@ function CostEditor({
           </option>
         ))}
       </select>
-      {cost && (
-        <input
-          type="number"
-          min={0}
-          className="seconds-input"
-          value={cost.amount}
-          onChange={(e) => handleAmountChange(e.currentTarget.value)}
-        />
-      )}
+      <input
+        type="number"
+        min={0}
+        className="seconds-input"
+        value={amount}
+        onChange={(e) => setAmount(Number(e.currentTarget.value) || 0)}
+      />
+      <button
+        disabled={!currencyType}
+        onClick={() => onSet({ currencyType, amount })}
+      >
+        Set
+      </button>
     </div>
   );
 }
@@ -249,8 +252,8 @@ function CostSummary({ entries }: { entries: GemPlanEntry[] }) {
       <h2>Currency needed</h2>
       <p>
         Each gem's price is fixed but varies gem-to-gem, so it's entered
-        manually the first time in the Cost column above — after that it's
-        remembered and auto-fills anywhere else that gem shows up. Quest
+        once in the Cost column above — after that it's locked in,
+        remembered, and auto-fills anywhere else that gem shows up. Quest
         reward gems are free.
       </p>
       {acts.map((act) => (

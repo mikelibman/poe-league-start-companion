@@ -11,12 +11,14 @@ export type GemSource =
   | { type: "vendor"; label: string; vendorId?: string }
   | { type: "unspecified" };
 
-// Vendor gem prices scale with the gem's level and rise with each
-// purchase — there's no fixed "correct" cost to look up, so this is a
-// manual field the user fills in from what they actually see in-game
-// (same "manual input for what we can't reliably determine" pattern as
-// vendor selection). Quest-reward gems are free; this stays null for them
-// unless the user has a reason to note something.
+// A vendor gem's price is fixed — it doesn't scale with character level
+// or purchase count — but varies gem-to-gem (one might cost a Scroll of
+// Wisdom, another an Orb of Chance), and isn't reference data the app
+// ships with. So it's entered manually once per gem (see
+// GemPlanContext.setEntryCost, and the shared `knownGemCosts` lookup in
+// store.ts) and locked in from then on — not a per-plan or per-entry
+// value the user can edit afterward. Quest-reward gems are free and stay
+// null.
 export interface CurrencyCost {
   currencyType: string;
   amount: number;

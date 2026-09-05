@@ -44,7 +44,7 @@ interface GemPlanContextValue {
   addEntries: (planId: string, entries: NewGemPlanEntry[]) => void;
   removeEntry: (planId: string, entryId: string) => void;
   moveEntry: (planId: string, entryId: string, direction: "up" | "down") => void;
-  setEntryCost: (planId: string, entryId: string, cost: CurrencyCost | null) => void;
+  setEntryCost: (planId: string, entryId: string, cost: CurrencyCost) => void;
   toggleBought: (entryId: string, bought: boolean) => void;
   isQuestTaken: (planId: string, questId: string) => boolean;
   /** Adds the given gems (direct reward and/or vendor-unlock picks) and
@@ -213,33 +213,30 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
     }));
   }
 
-  // A fixed per-gem price (see D-note above) is worth teaching the shared
-  // map, and retroactively applying to any other un-priced entry for that
-  // same gem across every plan — not just this one — since it's the gem
-  // that has the price, not this particular plan's copy of it.
-  function setEntryCost(planId: string, entryId: string, cost: CurrencyCost | null) {
+  // A gem's price is a fixed, real property of the gem — not a per-plan
+  // guess — so once set it's locked and can't be changed from here again.
+  // Setting it teaches the shared map, and retroactively applies to any
+  // other un-priced entry for that same gem across every plan, since it's
+  // the gem that has the price, not this particular plan's copy of it.
+  function setEntryCost(planId: string, entryId: string, cost: CurrencyCost) {
     const plan = plans.find((p) => p.id === planId);
-    const gemName = plan?.entries.find((e) => e.id === entryId)?.gemName;
+    const entry = plan?.entries.find((e) => e.id === entryId);
+    if (!entry || entry.cost) return;
+    const gemName = entry.gemName;
 
     const nextPlans = plans.map((p) => ({
       ...p,
-      entries: p.entries.map((e) => {
-        if (e.id === entryId) return { ...e, cost };
-        if (cost && gemName && e.gemName === gemName && !e.cost) {
-          return { ...e, cost };
-        }
-        return e;
-      }),
+      entries: p.entries.map((e) =>
+        e.gemName === gemName && !e.cost ? { ...e, cost } : e,
+      ),
     }));
     persist(nextPlans, activePlanId);
 
-    if (cost && gemName) {
-      setKnownGemCosts((current) => {
-        const next = { ...current, [gemName]: cost };
-        void saveGemCosts(next);
-        return next;
-      });
-    }
+    setKnownGemCosts((current) => {
+      const next = { ...current, [gemName]: cost };
+      void saveGemCosts(next);
+      return next;
+    });
   }
 
   // Buy-order/priority reordering — swaps with the neighboring entry.
