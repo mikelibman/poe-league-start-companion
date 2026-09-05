@@ -11,11 +11,23 @@ export type GemSource =
   | { type: "vendor"; label: string; vendorId?: string }
   | { type: "unspecified" };
 
+// Vendor gem prices scale with the gem's level and rise with each
+// purchase — there's no fixed "correct" cost to look up, so this is a
+// manual field the user fills in from what they actually see in-game
+// (same "manual input for what we can't reliably determine" pattern as
+// vendor selection). Quest-reward gems are free; this stays null for them
+// unless the user has a reason to note something.
+export interface CurrencyCost {
+  currencyType: string;
+  amount: number;
+}
+
 export interface GemPlanEntry {
   id: string;
   gemName: string;
   act: number;
   source: GemSource;
+  cost: CurrencyCost | null;
 }
 
 // A plan is a reusable template kept across league starts (spec: "one per

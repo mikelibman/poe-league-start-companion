@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useGemPlan } from "./GemPlanContext";
 import { useReferenceData } from "../../core/ReferenceDataContext";
 import { POE_CLASSES, type PoeClass } from "../../core/poeClasses";
+import { POE_CURRENCY_TYPES } from "../../core/poeCurrency";
 import { parsePobCode } from "./pobImport";
 import type { QuestRewardEntry } from "../../core/referenceData";
-import type { GemPlan, GemPlanEntry, GemSource } from "./types";
+import type { CurrencyCost, GemPlan, GemPlanEntry, GemSource } from "./types";
 
 function sourceLabel(source: GemSource): string {
   switch (source.type) {
@@ -32,6 +33,7 @@ export function GemPlanModule() {
     addEntries,
     removeEntry,
     moveEntry,
+    setEntryCost,
     toggleBought,
   } = useGemPlan();
 
@@ -101,6 +103,7 @@ export function GemPlanModule() {
                   <th>Gem</th>
                   <th>Act</th>
                   <th>Source</th>
+                  <th>Cost</th>
                   <th></th>
                 </tr>
               </thead>
@@ -119,6 +122,14 @@ export function GemPlanModule() {
                     <td>{entry.gemName}</td>
                     <td>{entry.act}</td>
                     <td>{sourceLabel(entry.source)}</td>
+                    <td>
+                      <CostEditor
+                        cost={entry.cost}
+                        onChange={(cost) =>
+                          setEntryCost(activePlan.id, entry.id, cost)
+                        }
+                      />
+                    </td>
                     <td>
                       <div className="row-buttons">
                         <button
@@ -145,11 +156,110 @@ export function GemPlanModule() {
               </tbody>
             </table>
           )}
+
+          <CostSummary entries={activePlan.entries} />
         </>
       ) : (
         <p>Create a plan above to start adding gems.</p>
       )}
     </section>
+  );
+}
+
+// Vendor gem prices scale with the gem's level and rise with each
+// purchase (confirmed against the wiki — there's no fixed lookup value),
+// so cost is a manual per-entry field: fill in what's actually seen
+// in-game, and totals below update automatically.
+function CostEditor({
+  cost,
+  onChange,
+}: {
+  cost: CurrencyCost | null;
+  onChange: (cost: CurrencyCost | null) => void;
+}) {
+  function handleTypeChange(currencyType: string) {
+    if (!currencyType) {
+      onChange(null);
+      return;
+    }
+    onChange({ currencyType, amount: cost?.amount ?? 1 });
+  }
+
+  function handleAmountChange(amountStr: string) {
+    if (!cost) return;
+    const amount = Number(amountStr);
+    onChange({ currencyType: cost.currencyType, amount: Number.isFinite(amount) ? amount : 0 });
+  }
+
+  return (
+    <div className="row-buttons">
+      <select value={cost?.currencyType ?? ""} onChange={(e) => handleTypeChange(e.target.value)}>
+        <option value="">—</option>
+        {POE_CURRENCY_TYPES.map((currency) => (
+          <option key={currency} value={currency}>
+            {currency}
+          </option>
+        ))}
+      </select>
+      {cost && (
+        <input
+          type="number"
+          min={0}
+          className="seconds-input"
+          value={cost.amount}
+          onChange={(e) => handleAmountChange(e.currentTarget.value)}
+        />
+      )}
+    </div>
+  );
+}
+
+function summarizeCosts(entries: GemPlanEntry[]): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const entry of entries) {
+    if (!entry.cost) continue;
+    totals[entry.cost.currencyType] = (totals[entry.cost.currencyType] ?? 0) + entry.cost.amount;
+  }
+  return totals;
+}
+
+function CostList({ totals }: { totals: Record<string, number> }) {
+  const currencies = Object.keys(totals);
+  if (currencies.length === 0) {
+    return <p>No costs entered yet.</p>;
+  }
+  return (
+    <ul className="module-toggle-list">
+      {currencies.map((currency) => (
+        <li key={currency}>
+          {totals[currency]} × {currency}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CostSummary({ entries }: { entries: GemPlanEntry[] }) {
+  const acts = [...new Set(entries.map((e) => e.act))].sort((a, b) => a - b);
+
+  return (
+    <div>
+      <h2>Currency needed</h2>
+      <p>
+        Vendor gem prices scale with the gem's level and rise with each
+        purchase, so there's no fixed amount to pre-fill — enter what you
+        actually see in-game in the Cost column above, and these totals
+        update automatically. Quest reward gems are free.
+      </p>
+      {acts.map((act) => (
+        <div key={act}>
+          <h3>Act {act} subtotal</h3>
+          <CostList totals={summarizeCosts(entries.filter((e) => e.act === act))} />
+        </div>
+      ))}
+      <h3>Total</h3>
+      <CostList totals={summarizeCosts(entries)} />
+    </div>
   );
 }
 
@@ -318,7 +428,7 @@ function QuestCard({
   }
 
   function handleTake() {
-    const entries: Omit<GemPlanEntry, "id">[] = [];
+    const entries: Omit<GemPlanEntry, "id" | "cost">[] = [];
     for (const gem of directGems) {
       if (selected.has(`direct::${gem}`)) {
         entries.push({

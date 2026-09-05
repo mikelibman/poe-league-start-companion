@@ -8,12 +8,19 @@ import {
 } from "react";
 import { loadPlans, savePlans, loadProgress, saveProgress } from "./store";
 import { useTimer } from "../timer/TimerContext";
-import type { GemPlan, GemPlanEntry } from "./types";
+import type { CurrencyCost, GemPlan, GemPlanEntry } from "./types";
 import type { PoeClass } from "../../core/poeClasses";
 
 function questKey(planId: string, questId: string): string {
   return `${planId}::${questId}`;
 }
+
+// `cost` is optional here (unlike on the stored GemPlanEntry) so every
+// existing quick-add/custom/PoB-import call site can keep constructing
+// entries without it — it defaults to null (not yet priced) internally.
+type NewGemPlanEntry = Omit<GemPlanEntry, "id" | "cost"> & {
+  cost?: CurrencyCost | null;
+};
 
 interface GemPlanContextValue {
   plans: GemPlan[];
@@ -25,10 +32,11 @@ interface GemPlanContextValue {
   createPlan: (name: string, characterClass: PoeClass) => void;
   deletePlan: (id: string) => void;
   setPlanClass: (planId: string, characterClass: PoeClass) => void;
-  addEntry: (planId: string, entry: Omit<GemPlanEntry, "id">) => void;
-  addEntries: (planId: string, entries: Omit<GemPlanEntry, "id">[]) => void;
+  addEntry: (planId: string, entry: NewGemPlanEntry) => void;
+  addEntries: (planId: string, entries: NewGemPlanEntry[]) => void;
   removeEntry: (planId: string, entryId: string) => void;
   moveEntry: (planId: string, entryId: string, direction: "up" | "down") => void;
+  setEntryCost: (planId: string, entryId: string, cost: CurrencyCost | null) => void;
   toggleBought: (entryId: string, bought: boolean) => void;
   isQuestTaken: (planId: string, questId: string) => boolean;
   /** Adds the given gems (direct reward and/or vendor-unlock picks) and
@@ -37,7 +45,7 @@ interface GemPlanContextValue {
   takeQuestReward: (
     planId: string,
     questId: string,
-    entries: Omit<GemPlanEntry, "id">[],
+    entries: NewGemPlanEntry[],
   ) => void;
   skipQuest: (planId: string, questId: string) => void;
 }
@@ -141,19 +149,26 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
     updatePlan(planId, (plan) => ({ ...plan, characterClass }));
   }
 
-  function addEntry(planId: string, entry: Omit<GemPlanEntry, "id">) {
-    updatePlan(planId, (plan) => ({
-      ...plan,
-      entries: [...plan.entries, { ...entry, id: crypto.randomUUID() }],
-    }));
-  }
-
-  function addEntries(planId: string, entries: Omit<GemPlanEntry, "id">[]) {
+  function addEntry(planId: string, entry: NewGemPlanEntry) {
     updatePlan(planId, (plan) => ({
       ...plan,
       entries: [
         ...plan.entries,
-        ...entries.map((entry) => ({ ...entry, id: crypto.randomUUID() })),
+        { ...entry, cost: entry.cost ?? null, id: crypto.randomUUID() },
+      ],
+    }));
+  }
+
+  function addEntries(planId: string, entries: NewGemPlanEntry[]) {
+    updatePlan(planId, (plan) => ({
+      ...plan,
+      entries: [
+        ...plan.entries,
+        ...entries.map((entry) => ({
+          ...entry,
+          cost: entry.cost ?? null,
+          id: crypto.randomUUID(),
+        })),
       ],
     }));
   }
@@ -162,6 +177,13 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
     updatePlan(planId, (plan) => ({
       ...plan,
       entries: plan.entries.filter((e) => e.id !== entryId),
+    }));
+  }
+
+  function setEntryCost(planId: string, entryId: string, cost: CurrencyCost | null) {
+    updatePlan(planId, (plan) => ({
+      ...plan,
+      entries: plan.entries.map((e) => (e.id === entryId ? { ...e, cost } : e)),
     }));
   }
 
@@ -211,7 +233,7 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
   function takeQuestReward(
     planId: string,
     questId: string,
-    entries: Omit<GemPlanEntry, "id">[],
+    entries: NewGemPlanEntry[],
   ) {
     if (entries.length > 0) addEntries(planId, entries);
     markQuestTaken(planId, questId);
@@ -239,6 +261,7 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
         addEntries,
         removeEntry,
         moveEntry,
+        setEntryCost,
         toggleBought,
         isQuestTaken,
         takeQuestReward,
