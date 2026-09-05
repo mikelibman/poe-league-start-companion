@@ -10,6 +10,15 @@ export interface ZoneEnteredEvent {
   rawTimestamp: string;
 }
 
+// The player's own level-up broadcast — confirmed against a real Client.txt
+// as the one reliable place the client logs the local character's own name
+// (never on the zone-entry line, and not anywhere at login/character-select).
+export interface CharacterLevelEvent {
+  name: string;
+  characterClass: string;
+  level: number;
+}
+
 export async function detectLogPath(): Promise<string | null> {
   return invoke<string | null>("logwatcher_detect_path");
 }
@@ -34,6 +43,14 @@ export function onZoneEntered(
   callback: (event: ZoneEnteredEvent) => void,
 ): Promise<UnlistenFn> {
   return listen<ZoneEnteredEvent>("log-watcher://zone-entered", (e) =>
+    callback(e.payload),
+  );
+}
+
+export function onCharacterLevel(
+  callback: (event: CharacterLevelEvent) => void,
+): Promise<UnlistenFn> {
+  return listen<CharacterLevelEvent>("log-watcher://character-level", (e) =>
     callback(e.payload),
   );
 }

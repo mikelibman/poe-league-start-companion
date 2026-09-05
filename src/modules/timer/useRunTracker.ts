@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { onZoneEntered } from "../../core/logWatcher";
+import { onCharacterLevel, onZoneEntered } from "../../core/logWatcher";
 import { useSettings } from "../../core/SettingsContext";
 import type { ActiveRun, RunStatus, Split, TargetRouteEntry } from "./types";
 
@@ -7,18 +7,24 @@ import type { ActiveRun, RunStatus, Split, TargetRouteEntry } from "./types";
 // created into — it can't normally be revisited once you've left Act 1
 // progression, so entering it again is a very strong signal that a *new*
 // character was just made (including "deleted and recreated with the same
-// name", which is exactly what D7 guards against).
+// name", which is exactly what D7 guards against). Verified against a real
+// Client.txt: 44 distinct Twilight Strand entries across one log, matching
+// a pattern of repeated character creation for testing — exactly this case.
 const RUN_START_ZONE = "The Twilight Strand";
 
-// Client.txt has no reliable field for character name or league (unlike
-// zone transitions, which are unambiguous) — this is a deliberate
-// departure from the spec's literal "unseen character/league combo"
-// wording. Rather than guess at a log format we're not confident exists,
-// the zone entry triggers an automatic prompt and the user manually
-// confirms who's running, the same "manual input for what the log can't
-// tell us" pattern used for vendor selection (D11).
+// Client.txt has no field for the league (confirmed against a real log —
+// it only shows up incidentally in other players' trade-whisper text, not
+// from the client itself), so league stays fully manual. Character name
+// *is* reliably available, just not on the zone-entry line itself — it's
+// confirmed via the player's own level-up broadcast ("<Name> (<Class>) is
+// now level N"), which normally fires within the first minute or two of a
+// run. So the name is auto-suggested (and pre-filled) once that arrives,
+// but still requires the user's confirmation, same "manual input for what
+// the log can't fully guarantee" pattern used for vendor selection (D11).
 interface PendingConfirmation {
   enteredAtMs: number;
+  suggestedName: string | null;
+  suggestedClass: string | null;
 }
 
 function parseClientTimestamp(raw: string): number {
@@ -59,11 +65,11 @@ export function useRunTracker(targetRoute: TargetRouteEntry[]) {
   useEffect(() => {
     if (!timerEnabled) return;
 
-    const unlistenPromise = onZoneEntered((event) => {
+    const unlistenZonePromise = onZoneEntered((event) => {
       const enteredAtMs = parseClientTimestamp(event.rawTimestamp);
 
       if (event.zone === RUN_START_ZONE) {
-        setPending({ enteredAtMs });
+        setPending({ enteredAtMs, suggestedName: null, suggestedClass: null });
         setStatus("pending-confirmation");
         return;
       }
@@ -86,8 +92,19 @@ export function useRunTracker(targetRoute: TargetRouteEntry[]) {
       });
     });
 
+    // Only updates the pending confirmation's suggestion — once a run is
+    // already active, level-up events aren't otherwise used yet.
+    const unlistenLevelPromise = onCharacterLevel((event) => {
+      setPending((current) =>
+        current
+          ? { ...current, suggestedName: event.name, suggestedClass: event.characterClass }
+          : current,
+      );
+    });
+
     return () => {
-      void unlistenPromise.then((unlisten) => unlisten());
+      void unlistenZonePromise.then((unlisten) => unlisten());
+      void unlistenLevelPromise.then((unlisten) => unlisten());
     };
   }, [timerEnabled]);
 

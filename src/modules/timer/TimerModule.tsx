@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTimer } from "./TimerContext";
 import { useNowTick } from "./useNowTick";
 import { formatDuration, formatDelta } from "./format";
@@ -21,6 +21,23 @@ export function TimerModule() {
   const [characterName, setCharacterName] = useState("");
   const [league, setLeague] = useState("");
 
+  // Fresh fields for each new confirmation prompt...
+  useEffect(() => {
+    if (pending) {
+      setCharacterName("");
+      setLeague("");
+    }
+  }, [pending?.enteredAtMs]);
+
+  // ...pre-filled once the character's own level-up broadcast confirms a
+  // name (Client.txt has no name on the zone-entry line itself), but the
+  // user can still overwrite it before confirming.
+  useEffect(() => {
+    if (pending?.suggestedName) {
+      setCharacterName((current) => current || pending.suggestedName!);
+    }
+  }, [pending?.suggestedName]);
+
   const totalElapsedMs = run ? now - run.startedAtMs : 0;
   const currentZoneElapsedMs = run ? now - run.currentZoneEnteredAtMs : 0;
   const currentZoneTarget = run
@@ -36,8 +53,11 @@ export function TimerModule() {
         <div className="new-run-banner">
           <p>New run detected — entered The Twilight Strand.</p>
           <p>
-            Client.txt can't tell us the character name or league, so confirm
-            them here to start timing:
+            {pending.suggestedName
+              ? `Detected "${pending.suggestedName}"${
+                  pending.suggestedClass ? ` (${pending.suggestedClass})` : ""
+                } from a level-up — confirm below to start timing. Client.txt has no league field, so that's still manual.`
+              : "Waiting on the first level-up to detect a character name (or type it yourself) — Client.txt has no league field, so that's always manual."}
           </p>
           <div className="row-buttons">
             <input
