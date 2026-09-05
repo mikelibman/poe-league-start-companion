@@ -26,6 +26,7 @@ export function GemPlanModule() {
     setActivePlanId,
     createPlan,
     deletePlan,
+    setPlanClass,
     addEntry,
     addEntries,
     removeEntry,
@@ -35,6 +36,9 @@ export function GemPlanModule() {
   if (!loaded) {
     return <p>Loading gem plans…</p>;
   }
+
+  // Defensive: a plan saved before this field existed won't have one yet.
+  const planClass = activePlan?.characterClass;
 
   return (
     <section>
@@ -50,17 +54,38 @@ export function GemPlanModule() {
 
       {activePlan ? (
         <>
-          <p>
-            Class: <strong>{activePlan.characterClass}</strong> — quest and
-            vendor gem options below are filtered to what's actually
-            available to this class.
-          </p>
+          <div className="row-buttons">
+            <span>Class:</span>
+            <select
+              value={planClass ?? ""}
+              onChange={(e) =>
+                setPlanClass(activePlan.id, e.target.value as PoeClass)
+              }
+            >
+              <option value="" disabled>
+                Select a class…
+              </option>
+              {POE_CLASSES.map((cls) => (
+                <option key={cls} value={cls}>
+                  {cls}
+                </option>
+              ))}
+            </select>
+          </div>
+          {!planClass && (
+            <p className="error-text">
+              Pick a class above — quest and vendor gem options depend on it
+              in PoE.
+            </p>
+          )}
 
-          <QuickAdd
-            planId={activePlan.id}
-            characterClass={activePlan.characterClass}
-            onAdd={addEntry}
-          />
+          {planClass && (
+            <QuickAdd
+              planId={activePlan.id}
+              characterClass={planClass}
+              onAdd={addEntry}
+            />
+          )}
           <PobImport planId={activePlan.id} onImport={addEntries} />
 
           <h2>Gems</h2>

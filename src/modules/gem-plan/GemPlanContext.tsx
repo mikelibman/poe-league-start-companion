@@ -20,6 +20,7 @@ interface GemPlanContextValue {
   setActivePlanId: (id: string | null) => void;
   createPlan: (name: string, characterClass: PoeClass) => void;
   deletePlan: (id: string) => void;
+  setPlanClass: (planId: string, characterClass: PoeClass) => void;
   addEntry: (planId: string, entry: Omit<GemPlanEntry, "id">) => void;
   addEntries: (planId: string, entries: Omit<GemPlanEntry, "id">[]) => void;
   removeEntry: (planId: string, entryId: string) => void;
@@ -95,6 +96,12 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  // Editable after creation too, not just fixed at plan-creation time —
+  // also how a plan saved before this field existed gets one assigned.
+  function setPlanClass(planId: string, characterClass: PoeClass) {
+    updatePlan(planId, (plan) => ({ ...plan, characterClass }));
+  }
+
   function addEntry(planId: string, entry: Omit<GemPlanEntry, "id">) {
     updatePlan(planId, (plan) => ({
       ...plan,
@@ -142,6 +149,7 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
         setActivePlanId,
         createPlan,
         deletePlan,
+        setPlanClass,
         addEntry,
         addEntries,
         removeEntry,
