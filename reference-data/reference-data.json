@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "note": "STARTER DATA — NOT VERIFIED against the current game version. This exists to prove out the fetch+cache pipeline (Issue #3) with a realistic shape, not as an authoritative source. Every entry needs a pass by someone who actually plays current-patch PoE before the gem plan / regex builder modules (Issues #5-6) depend on it for real. Contributions/corrections welcome via PR.",
+  "questRewards": [
+    {
+      "id": "a1-enemy-at-the-gate-added-fire-damage",
+      "act": 1,
+      "quest": "Enemy at the Gate",
+      "gem": "Added Fire Damage Support"
+    }
+  ],
+  "vendorStock": [
+    {
+      "vendorId": "act1-nessa",
+      "act": 1,
+      "vendor": "Nessa",
+      "gems": ["Fireball", "Freezing Pulse", "Spark", "Molten Strike"]
+    },
+    {
+      "vendorId": "act2-greust",
+      "act": 2,
+      "vendor": "Greust",
+      "gems": ["Added Chaos Damage Support", "Faster Attacks Support"]
+    },
+    {
+      "vendorId": "act3-petarus-vanja",
+      "act": 3,
+      "vendor": "Petarus & Vanja",
+      "gems": ["Faster Casting Support", "Elemental Proliferation Support"]
+    }
+  ],
+  "itemBases": [
+    {
+      "category": "movement-speed-boots",
+      "bases": ["Wool Shoes", "Leather Boots", "Deerskin Boots"]
+    },
+    {
+      "category": "leveling-wands",
+      "bases": ["Driftwood Wand", "Sage Wand"]
+    }
+  ],
+  "gamblingVendors": ["act3-petarus-vanja"]
+}

@@ -6,6 +6,7 @@ use modules::log_watcher::{
     autostart, logwatcher_detect_path, logwatcher_get_path, logwatcher_set_path,
     logwatcher_start, logwatcher_stop, WatcherHandle,
 };
+use modules::reference_data::refdata_load;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -26,6 +27,7 @@ pub fn run() {
             logwatcher_set_path,
             logwatcher_start,
             logwatcher_stop,
+            refdata_load,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -9,6 +9,7 @@
 pub mod core;
 pub mod log_locale;
 pub mod log_watcher;
+pub mod reference_data;
 
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};

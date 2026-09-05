@@ -1,3 +1,5 @@
+import type { ReferenceData } from "./referenceData";
+
 export interface Vendor {
   id: string;
   name: string;
@@ -5,10 +7,9 @@ export interface Vendor {
   gamblingCapable: boolean;
 }
 
-// Placeholder sample data only, just enough to exercise the VendorSelector
-// component and shared selection state. Issue #3 (remote reference data)
-// replaces this with the real hosted vendor list — treat none of this as
-// authoritative game data.
+// Fallback only, used when reference data hasn't loaded yet and there's no
+// local cache either (e.g. very first launch with no network) — treat none
+// of this as authoritative game data.
 export const PLACEHOLDER_VENDORS: Vendor[] = [
   { id: "act1-nessa", name: "Nessa", act: 1, gamblingCapable: false },
   { id: "act2-greust", name: "Greust", act: 2, gamblingCapable: false },
@@ -19,3 +20,17 @@ export const PLACEHOLDER_VENDORS: Vendor[] = [
     gamblingCapable: true,
   },
 ];
+
+/** Builds the real vendor list from the fetched/cached reference data
+ * (see Issue #3) — `gamblingVendors` and `vendorStock` share `vendorId`s,
+ * which is how a vendor's gambling capability gets attached without a
+ * separate lookup. */
+export function deriveVendorsFromReferenceData(data: ReferenceData): Vendor[] {
+  const gamblingIds = new Set(data.gamblingVendors);
+  return data.vendorStock.map((entry) => ({
+    id: entry.vendorId,
+    name: entry.vendor,
+    act: entry.act,
+    gamblingCapable: gamblingIds.has(entry.vendorId),
+  }));
+}
