@@ -86,6 +86,34 @@ body {
   color: #d1453b;
 }
 
+.new-run-banner {
+  border: 1px solid rgba(100, 108, 255, 0.4);
+  background-color: rgba(100, 108, 255, 0.08);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+table {
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+}
+
+th,
+td {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  padding: 0.3em 0.6em;
+  text-align: left;
+}
+
+.act-input {
+  width: 3em;
+}
+
+.seconds-input {
+  width: 7em;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
@@ -102,5 +130,10 @@ body {
 
   .app-nav a.active {
     background-color: rgba(100, 108, 255, 0.25);
+  }
+
+  th,
+  td {
+    border-color: rgba(255, 255, 255, 0.2);
   }
 }

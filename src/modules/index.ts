@@ -2,3 +2,4 @@
 // Adding/removing a feature module is adding/removing one line here.
 import "./dashboard/register";
 import "./settings/register";
+import "./timer/register";
