@@ -1,15 +1,10 @@
 // Core module: the local JSON store used by every other module. Namespaced
 // `core_*` per the module-registry convention (see `modules/mod.rs`).
 
+use super::app_data_dir;
 use crate::storage;
 use serde_json::Value;
-use tauri::{AppHandle, Manager};
-
-fn app_data_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map_err(|e| format!("could not resolve app data dir: {e}"))
-}
+use tauri::AppHandle;
 
 #[tauri::command]
 pub fn core_store_read(app: AppHandle, store: String) -> Result<Value, String> {

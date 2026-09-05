@@ -1,5 +1,6 @@
 import { getModules } from "../../core/moduleRegistry";
 import { useSettings } from "../../core/SettingsContext";
+import { LogWatcherSettings } from "./LogWatcherSettings";
 
 export function SettingsModule() {
   const { disabledModules, toggleModule, loaded } = useSettings();
@@ -12,6 +13,7 @@ export function SettingsModule() {
   return (
     <section>
       <h1>Settings</h1>
+      <LogWatcherSettings />
       <h2>Modules</h2>
       {optionalModules.length === 0 ? (
         <p>No optional modules installed yet.</p>

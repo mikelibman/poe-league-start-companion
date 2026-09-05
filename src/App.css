@@ -76,6 +76,16 @@ body {
   gap: 0.5rem;
 }
 
+.row-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.error-text {
+  color: #d1453b;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
