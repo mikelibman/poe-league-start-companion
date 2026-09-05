@@ -3,7 +3,8 @@ import { useGemPlan } from "./GemPlanContext";
 import { useReferenceData } from "../../core/ReferenceDataContext";
 import { POE_CLASSES, type PoeClass } from "../../core/poeClasses";
 import { parsePobCode } from "./pobImport";
-import type { GemPlan, GemSource } from "./types";
+import type { QuestRewardEntry } from "../../core/referenceData";
+import type { GemPlan, GemPlanEntry, GemSource } from "./types";
 
 function sourceLabel(source: GemSource): string {
   switch (source.type) {
@@ -30,6 +31,7 @@ export function GemPlanModule() {
     addEntry,
     addEntries,
     removeEntry,
+    moveEntry,
     toggleBought,
   } = useGemPlan();
 
@@ -88,7 +90,7 @@ export function GemPlanModule() {
           )}
           <PobImport planId={activePlan.id} onImport={addEntries} />
 
-          <h2>Gems</h2>
+          <h2>Gems (buy order)</h2>
           {activePlan.entries.length === 0 ? (
             <p>No gems in this plan yet.</p>
           ) : (
@@ -103,7 +105,7 @@ export function GemPlanModule() {
                 </tr>
               </thead>
               <tbody>
-                {activePlan.entries.map((entry) => (
+                {activePlan.entries.map((entry, i) => (
                   <tr key={entry.id}>
                     <td>
                       <input
@@ -118,9 +120,25 @@ export function GemPlanModule() {
                     <td>{entry.act}</td>
                     <td>{sourceLabel(entry.source)}</td>
                     <td>
-                      <button onClick={() => removeEntry(activePlan.id, entry.id)}>
-                        Remove
-                      </button>
+                      <div className="row-buttons">
+                        <button
+                          onClick={() => moveEntry(activePlan.id, entry.id, "up")}
+                          disabled={i === 0}
+                          title="Move up"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => moveEntry(activePlan.id, entry.id, "down")}
+                          disabled={i === activePlan.entries.length - 1}
+                          title="Move down"
+                        >
+                          ↓
+                        </button>
+                        <button onClick={() => removeEntry(activePlan.id, entry.id)}>
+                          Remove
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -193,6 +211,8 @@ function PlanSelector({
   );
 }
 
+type QuickAddTab = number | "vendors";
+
 function QuickAdd({
   planId,
   characterClass,
@@ -203,43 +223,203 @@ function QuickAdd({
   onAdd: (planId: string, entry: { gemName: string; act: number; source: GemSource }) => void;
 }) {
   const { data } = useReferenceData();
+  const acts = [...new Set((data?.questRewards ?? []).map((q) => q.act))].sort(
+    (a, b) => a - b,
+  );
+  const [tab, setTab] = useState<QuickAddTab>(acts[0] ?? "vendors");
 
-  const [selectedQuestGem, setSelectedQuestGem] = useState("");
+  return (
+    <div>
+      <h2>Add gems</h2>
+
+      <div className="row-buttons">
+        {acts.map((act) => (
+          <button key={act} onClick={() => setTab(act)} disabled={tab === act}>
+            Act {act}
+          </button>
+        ))}
+        <button onClick={() => setTab("vendors")} disabled={tab === "vendors"}>
+          Vendors
+        </button>
+      </div>
+
+      {typeof tab === "number" && (
+        <ActQuestList
+          act={tab}
+          planId={planId}
+          characterClass={characterClass}
+        />
+      )}
+      {tab === "vendors" && (
+        <VendorBrowse planId={planId} characterClass={characterClass} onAdd={onAdd} />
+      )}
+
+      <CustomAdd planId={planId} onAdd={onAdd} />
+    </div>
+  );
+}
+
+function ActQuestList({
+  act,
+  planId,
+  characterClass,
+}: {
+  act: number;
+  planId: string;
+  characterClass: PoeClass;
+}) {
+  const { data } = useReferenceData();
+  const { isQuestTaken } = useGemPlan();
+
+  const quests = (data?.questRewards ?? [])
+    .filter((q) => q.act === act)
+    .filter((q) => !isQuestTaken(planId, q.id))
+    .sort((a, b) => a.order - b.order);
+
+  if (quests.length === 0) {
+    return <p>No quests left to take in Act {act}.</p>;
+  }
+
+  return (
+    <div>
+      {quests.map((quest) => (
+        <QuestCard
+          key={quest.id}
+          quest={quest}
+          planId={planId}
+          characterClass={characterClass}
+        />
+      ))}
+    </div>
+  );
+}
+
+function QuestCard({
+  quest,
+  planId,
+  characterClass,
+}: {
+  quest: QuestRewardEntry;
+  planId: string;
+  characterClass: PoeClass;
+}) {
+  const { takeQuestReward, skipQuest } = useGemPlan();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const directGems = quest.gemsByClass[characterClass] ?? [];
+
+  function toggle(key: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function handleTake() {
+    const entries: Omit<GemPlanEntry, "id">[] = [];
+    for (const gem of directGems) {
+      if (selected.has(`direct::${gem}`)) {
+        entries.push({
+          gemName: gem,
+          act: quest.act,
+          source: { type: "quest", label: quest.quest, questId: quest.id },
+        });
+      }
+    }
+    for (const unlock of quest.vendorUnlocks) {
+      for (const gem of unlock.gemsByClass[characterClass] ?? []) {
+        if (selected.has(`vendor::${unlock.vendorId}::${gem}`)) {
+          entries.push({
+            gemName: gem,
+            act: quest.act,
+            source: { type: "vendor", label: unlock.vendor, vendorId: unlock.vendorId },
+          });
+        }
+      }
+    }
+    takeQuestReward(planId, quest.id, entries);
+    setSelected(new Set());
+  }
+
+  return (
+    <div className="quest-card">
+      <h3>{quest.quest}</h3>
+
+      {directGems.length > 0 && (
+        <>
+          <p>Reward gem(s) — pick any you're taking:</p>
+          <ul className="module-toggle-list">
+            {directGems.map((gem) => (
+              <li key={gem}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(`direct::${gem}`)}
+                    onChange={() => toggle(`direct::${gem}`)}
+                  />
+                  {gem}
+                </label>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {quest.vendorUnlocks.map((unlock) => {
+        const gems = unlock.gemsByClass[characterClass] ?? [];
+        if (gems.length === 0) return null;
+        return (
+          <details key={unlock.vendorId}>
+            <summary>
+              Also unlocks at {unlock.vendor} ({gems.length} gem
+              {gems.length === 1 ? "" : "s"})
+            </summary>
+            <ul className="module-toggle-list">
+              {gems.map((gem) => (
+                <li key={gem}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(`vendor::${unlock.vendorId}::${gem}`)}
+                      onChange={() => toggle(`vendor::${unlock.vendorId}::${gem}`)}
+                    />
+                    {gem}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </details>
+        );
+      })}
+
+      <div className="row-buttons">
+        <button onClick={handleTake} disabled={selected.size === 0}>
+          Add selected &amp; mark done
+        </button>
+        <button onClick={() => skipQuest(planId, quest.id)}>
+          Skip (nothing wanted)
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function VendorBrowse({
+  planId,
+  characterClass,
+  onAdd,
+}: {
+  planId: string;
+  characterClass: PoeClass;
+  onAdd: (planId: string, entry: { gemName: string; act: number; source: GemSource }) => void;
+}) {
+  const { data } = useReferenceData();
   const [selectedVendorId, setSelectedVendorId] = useState("");
   const [selectedVendorGem, setSelectedVendorGem] = useState("");
 
-  const [customGemName, setCustomGemName] = useState("");
-  const [customAct, setCustomAct] = useState("1");
-  const [customSourceType, setCustomSourceType] = useState<"quest" | "vendor" | "unspecified">(
-    "unspecified",
-  );
-  const [customSourceLabel, setCustomSourceLabel] = useState("");
-
   const vendorEntry = data?.vendorStock.find((v) => v.vendorId === selectedVendorId);
-
-  // Flatten quest rewards to one option per (quest, gem) pair for this
-  // class — a quest offers a *choice* of gems, not the whole list at once.
-  const questOptions =
-    data?.questRewards.flatMap((quest) =>
-      (quest.gemsByClass[characterClass] ?? []).map((gem) => ({
-        key: `${quest.id}::${gem}`,
-        act: quest.act,
-        questId: quest.id,
-        questName: quest.quest,
-        gem,
-      })),
-    ) ?? [];
-
-  function addFromQuest() {
-    const option = questOptions.find((o) => o.key === selectedQuestGem);
-    if (!option) return;
-    onAdd(planId, {
-      gemName: option.gem,
-      act: option.act,
-      source: { type: "quest", label: option.questName, questId: option.questId },
-    });
-    setSelectedQuestGem("");
-  }
 
   function addFromVendor() {
     if (!vendorEntry || !selectedVendorGem) return;
@@ -250,6 +430,59 @@ function QuickAdd({
     });
     setSelectedVendorGem("");
   }
+
+  if (!data || data.vendorStock.length === 0) {
+    return <p>No vendor data loaded yet.</p>;
+  }
+
+  return (
+    <div className="row-buttons">
+      <select
+        value={selectedVendorId}
+        onChange={(e) => {
+          setSelectedVendorId(e.target.value);
+          setSelectedVendorGem("");
+        }}
+      >
+        <option value="">Vendor…</option>
+        {data.vendorStock.map((vendor) => (
+          <option key={vendor.vendorId} value={vendor.vendorId}>
+            Act {vendor.act} — {vendor.vendor}
+          </option>
+        ))}
+      </select>
+      <select
+        value={selectedVendorGem}
+        onChange={(e) => setSelectedVendorGem(e.target.value)}
+        disabled={!vendorEntry}
+      >
+        <option value="">Gem…</option>
+        {vendorEntry?.gemsByClass[characterClass]?.map((gem) => (
+          <option key={gem} value={gem}>
+            {gem}
+          </option>
+        ))}
+      </select>
+      <button onClick={addFromVendor} disabled={!vendorEntry || !selectedVendorGem}>
+        Add
+      </button>
+    </div>
+  );
+}
+
+function CustomAdd({
+  planId,
+  onAdd,
+}: {
+  planId: string;
+  onAdd: (planId: string, entry: { gemName: string; act: number; source: GemSource }) => void;
+}) {
+  const [customGemName, setCustomGemName] = useState("");
+  const [customAct, setCustomAct] = useState("1");
+  const [customSourceType, setCustomSourceType] = useState<"quest" | "vendor" | "unspecified">(
+    "unspecified",
+  );
+  const [customSourceLabel, setCustomSourceLabel] = useState("");
 
   function addCustom() {
     if (!customGemName.trim()) return;
@@ -267,93 +500,36 @@ function QuickAdd({
   }
 
   return (
-    <div>
-      <h2>Add gems</h2>
-
-      {questOptions.length > 0 && (
-        <div className="row-buttons">
-          <select
-            value={selectedQuestGem}
-            onChange={(e) => setSelectedQuestGem(e.target.value)}
-          >
-            <option value="">Quest reward…</option>
-            {questOptions.map((option) => (
-              <option key={option.key} value={option.key}>
-                Act {option.act} — {option.questName}: {option.gem}
-              </option>
-            ))}
-          </select>
-          <button onClick={addFromQuest} disabled={!selectedQuestGem}>
-            Add
-          </button>
-        </div>
-      )}
-
-      {data && data.vendorStock.length > 0 && (
-        <div className="row-buttons">
-          <select
-            value={selectedVendorId}
-            onChange={(e) => {
-              setSelectedVendorId(e.target.value);
-              setSelectedVendorGem("");
-            }}
-          >
-            <option value="">Vendor…</option>
-            {data.vendorStock.map((vendor) => (
-              <option key={vendor.vendorId} value={vendor.vendorId}>
-                Act {vendor.act} — {vendor.vendor}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedVendorGem}
-            onChange={(e) => setSelectedVendorGem(e.target.value)}
-            disabled={!vendorEntry}
-          >
-            <option value="">Gem…</option>
-            {vendorEntry?.gemsByClass[characterClass]?.map((gem) => (
-              <option key={gem} value={gem}>
-                {gem}
-              </option>
-            ))}
-          </select>
-          <button onClick={addFromVendor} disabled={!vendorEntry || !selectedVendorGem}>
-            Add
-          </button>
-        </div>
-      )}
-
-      <div className="row-buttons">
+    <div className="row-buttons">
+      <input
+        placeholder="Gem name"
+        value={customGemName}
+        onChange={(e) => setCustomGemName(e.currentTarget.value)}
+      />
+      <input
+        className="act-input"
+        placeholder="Act"
+        value={customAct}
+        onChange={(e) => setCustomAct(e.currentTarget.value)}
+      />
+      <select
+        value={customSourceType}
+        onChange={(e) =>
+          setCustomSourceType(e.target.value as "quest" | "vendor" | "unspecified")
+        }
+      >
+        <option value="unspecified">Unspecified</option>
+        <option value="quest">Quest</option>
+        <option value="vendor">Vendor</option>
+      </select>
+      {customSourceType !== "unspecified" && (
         <input
-          placeholder="Gem name"
-          value={customGemName}
-          onChange={(e) => setCustomGemName(e.currentTarget.value)}
+          placeholder={customSourceType === "quest" ? "Quest name" : "Vendor name"}
+          value={customSourceLabel}
+          onChange={(e) => setCustomSourceLabel(e.currentTarget.value)}
         />
-        <input
-          className="act-input"
-          placeholder="Act"
-          value={customAct}
-          onChange={(e) => setCustomAct(e.currentTarget.value)}
-        />
-        <select
-          value={customSourceType}
-          onChange={(e) =>
-            setCustomSourceType(e.target.value as "quest" | "vendor" | "unspecified")
-          }
-        >
-          <option value="unspecified">Unspecified</option>
-          <option value="quest">Quest</option>
-          <option value="vendor">Vendor</option>
-        </select>
-        {customSourceType !== "unspecified" && (
-          <input
-            placeholder={customSourceType === "quest" ? "Quest name" : "Vendor name"}
-            value={customSourceLabel}
-            onChange={(e) => setCustomSourceLabel(e.currentTarget.value)}
-          />
-        )}
-        <button onClick={addCustom}>Add custom</button>
-      </div>
+      )}
+      <button onClick={addCustom}>Add custom</button>
     </div>
   );
 }

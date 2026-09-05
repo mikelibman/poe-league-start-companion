@@ -8,11 +8,24 @@ import type { PoeClass } from "./poeClasses";
 
 export type GemsByClass = Record<PoeClass, string[]>;
 
+export interface VendorUnlock {
+  vendorId: string;
+  vendor: string;
+  gemsByClass: GemsByClass;
+}
+
 export interface QuestRewardEntry {
   id: string;
   act: number;
+  /** Position in this act's completion sequence — see README for sourcing. */
+  order: number;
   quest: string;
+  /** Can be empty for every class — some quests only unlock vendor stock,
+   * no direct reward (e.g. "The Root of the Problem"). */
   gemsByClass: GemsByClass;
+  /** Vendor stock this quest unlocks, if any — completing a quest often
+   * does this *and* grants a direct reward at the same time. */
+  vendorUnlocks: VendorUnlock[];
 }
 
 export interface VendorStockEntry {

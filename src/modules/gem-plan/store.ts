@@ -21,9 +21,14 @@ export async function savePlans(data: GemPlansData): Promise<void> {
 
 export interface GemPlanProgress {
   boughtEntryIds: string[];
+  /** `${planId}::${questId}` composite keys — which quest reward the buy
+   * flow has resolved (taken, or explicitly skipped), same
+   * plan-vs-progress split as boughtEntryIds: resets on a new run, since
+   * a new league start means redoing every quest. */
+  takenQuestKeys: string[];
 }
 
-const DEFAULT_PROGRESS: GemPlanProgress = { boughtEntryIds: [] };
+const DEFAULT_PROGRESS: GemPlanProgress = { boughtEntryIds: [], takenQuestKeys: [] };
 
 export async function loadProgress(): Promise<GemPlanProgress> {
   return readStore<GemPlanProgress>(PROGRESS_STORE, DEFAULT_PROGRESS);
