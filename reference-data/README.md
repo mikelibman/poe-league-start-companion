@@ -13,23 +13,50 @@ fetch locally so it still works mid-race without internet.
 
 ## Status
 
-The current `reference-data.json` is **starter data proving out the
-fetch/cache pipeline (Issue #3), not a verified source**. Quest rewards,
-vendor stock, and gambling-vendor entries need a pass from someone playing
-the current patch before the gem plan and regex builder modules (Issues
-#5-6) should treat this as ground truth. PRs correcting or expanding it are
-welcome.
+**Quest rewards and vendor gem stock (`questRewards`, `vendorStock`) are
+sourced from the [PoE Wiki's Quest Rewards
+page](https://www.poewiki.net/wiki/Quest_Rewards)** and are class-aware:
+both which gems a quest offers and which gems a vendor sells depend on
+character class in Path of Exile, so every entry carries a `gemsByClass`
+map rather than a flat list.
+
+Coverage: skill-gem *choice* rewards only exist on 11 quests across Acts
+1-4 — other quests with the same per-class table layout (Acts 5/6/7/9/10)
+hand out class-restricted weapon/armor base types instead, not gems, and
+are out of scope for this gem-only dataset. Vendor stock covers the four
+class-restricted Act 1-4 vendors (Nessa, Yeena, Clarissa, Petarus and
+Vanja) plus Siosa and Lilly Roth, whose stock ignores class entirely and
+is modeled as the union of quest-reward gems across their stated act
+range. Vendor stock is each vendor's final, fully-unlocked stock — not
+gated by which specific quest tier is complete, since the app only tracks
+zone entry, not quest completion.
+
+**`itemBases` and `gamblingVendors` remain unverified starter
+placeholders** — that pass hasn't happened yet. PRs correcting or
+expanding any of this are welcome; a patch update to gem availability is
+exactly the kind of change this file exists to make cheap.
 
 ## Schema
 
 ```jsonc
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "classes": ["Witch", "Shadow", "Ranger", "Duelist", "Marauder", "Templar", "Scion"],
   "questRewards": [
-    { "id": "...", "act": 1, "quest": "...", "gem": "..." }
+    {
+      "id": "a1-enemy-at-the-gate",
+      "act": 1,
+      "quest": "Enemy at the Gate",
+      "gemsByClass": { "Witch": ["Freezing Pulse", "..."], "Shadow": ["..."], "...": [] }
+    }
   ],
   "vendorStock": [
-    { "vendorId": "...", "act": 1, "vendor": "...", "gems": ["..."] }
+    {
+      "vendorId": "a1-nessa",
+      "act": 1,
+      "vendor": "Nessa",
+      "gemsByClass": { "Witch": ["..."], "...": [] }
+    }
   ],
   "itemBases": [
     { "category": "...", "bases": ["..."] }
@@ -40,4 +67,7 @@ welcome.
 
 `vendorId` values are shared between `vendorStock` and `gamblingVendors` —
 that's what lets the app mark a vendor's gambling capability without a
-separate lookup.
+separate lookup. `gemsByClass` keys always match `classes` exactly, even
+for vendors like Siosa/Lilly Roth whose stock doesn't actually vary by
+class (the same list is just repeated under every key, so the frontend
+never has to special-case "this vendor ignores class").

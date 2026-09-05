@@ -1,3 +1,5 @@
+import type { PoeClass } from "../../core/poeClasses";
+
 // Availability tagging (spec: "quest reward or vendor purchase") — an
 // entry can be linked back to reference data (questId/vendorId, used by
 // the Issue #6 regex builder to filter to what's currently buyable) or
@@ -18,9 +20,13 @@ export interface GemPlanEntry {
 
 // A plan is a reusable template kept across league starts (spec: "one per
 // build"); "bought" progress lives separately (see progress.ts) and resets
-// each time a new run starts.
+// each time a new run starts. Which gems a quest offers, and which gems a
+// vendor sells, both genuinely depend on class in PoE — so a plan commits
+// to one class up front, and the quick-add pickers filter reference data
+// by it.
 export interface GemPlan {
   id: string;
   name: string;
+  characterClass: PoeClass;
   entries: GemPlanEntry[];
 }

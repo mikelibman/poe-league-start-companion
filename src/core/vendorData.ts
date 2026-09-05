@@ -11,14 +11,9 @@ export interface Vendor {
 // local cache either (e.g. very first launch with no network) — treat none
 // of this as authoritative game data.
 export const PLACEHOLDER_VENDORS: Vendor[] = [
-  { id: "act1-nessa", name: "Nessa", act: 1, gamblingCapable: false },
-  { id: "act2-greust", name: "Greust", act: 2, gamblingCapable: false },
-  {
-    id: "act3-petarus-vanja",
-    name: "Petarus & Vanja",
-    act: 3,
-    gamblingCapable: true,
-  },
+  { id: "a1-nessa", name: "Nessa", act: 1, gamblingCapable: false },
+  { id: "a2-yeena", name: "Yeena", act: 2, gamblingCapable: false },
+  { id: "a3-clarissa", name: "Clarissa", act: 3, gamblingCapable: false },
 ];
 
 /** Builds the real vendor list from the fetched/cached reference data

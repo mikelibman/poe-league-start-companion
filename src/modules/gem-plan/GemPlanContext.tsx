@@ -9,6 +9,7 @@ import {
 import { loadPlans, savePlans, loadProgress, saveProgress } from "./store";
 import { useTimer } from "../timer/TimerContext";
 import type { GemPlan, GemPlanEntry } from "./types";
+import type { PoeClass } from "../../core/poeClasses";
 
 interface GemPlanContextValue {
   plans: GemPlan[];
@@ -17,7 +18,7 @@ interface GemPlanContextValue {
   boughtEntryIds: Set<string>;
   loaded: boolean;
   setActivePlanId: (id: string | null) => void;
-  createPlan: (name: string) => void;
+  createPlan: (name: string, characterClass: PoeClass) => void;
   deletePlan: (id: string) => void;
   addEntry: (planId: string, entry: Omit<GemPlanEntry, "id">) => void;
   addEntries: (planId: string, entries: Omit<GemPlanEntry, "id">[]) => void;
@@ -70,8 +71,13 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
     persist(plans, id);
   }
 
-  function createPlan(name: string) {
-    const plan: GemPlan = { id: crypto.randomUUID(), name, entries: [] };
+  function createPlan(name: string, characterClass: PoeClass) {
+    const plan: GemPlan = {
+      id: crypto.randomUUID(),
+      name,
+      characterClass,
+      entries: [],
+    };
     persist([...plans, plan], plan.id);
   }
 

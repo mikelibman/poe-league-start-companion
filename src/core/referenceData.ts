@@ -1,20 +1,25 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { PoeClass } from "./poeClasses";
 
 // Mirrors reference-data/reference-data.json (see that file's README for
-// the schema and its "starter data, not verified" status).
+// the schema, sourcing, and coverage notes). Quest rewards and vendor
+// stock are both class-aware — which gems a quest offers, and which gems
+// a vendor sells, genuinely depend on character class in PoE.
+
+export type GemsByClass = Record<PoeClass, string[]>;
 
 export interface QuestRewardEntry {
   id: string;
   act: number;
   quest: string;
-  gem: string;
+  gemsByClass: GemsByClass;
 }
 
 export interface VendorStockEntry {
   vendorId: string;
   act: number;
   vendor: string;
-  gems: string[];
+  gemsByClass: GemsByClass;
 }
 
 export interface ItemBaseCategory {
@@ -24,6 +29,7 @@ export interface ItemBaseCategory {
 
 export interface ReferenceData {
   schemaVersion: number;
+  classes: PoeClass[];
   questRewards: QuestRewardEntry[];
   vendorStock: VendorStockEntry[];
   itemBases: ItemBaseCategory[];

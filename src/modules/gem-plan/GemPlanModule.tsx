@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useGemPlan } from "./GemPlanContext";
 import { useReferenceData } from "../../core/ReferenceDataContext";
+import { POE_CLASSES, type PoeClass } from "../../core/poeClasses";
 import { parsePobCode } from "./pobImport";
-import type { GemSource } from "./types";
+import type { GemPlan, GemSource } from "./types";
 
 function sourceLabel(source: GemSource): string {
   switch (source.type) {
@@ -49,7 +50,17 @@ export function GemPlanModule() {
 
       {activePlan ? (
         <>
-          <QuickAdd planId={activePlan.id} onAdd={addEntry} />
+          <p>
+            Class: <strong>{activePlan.characterClass}</strong> — quest and
+            vendor gem options below are filtered to what's actually
+            available to this class.
+          </p>
+
+          <QuickAdd
+            planId={activePlan.id}
+            characterClass={activePlan.characterClass}
+            onAdd={addEntry}
+          />
           <PobImport planId={activePlan.id} onImport={addEntries} />
 
           <h2>Gems</h2>
@@ -106,17 +117,18 @@ function PlanSelector({
   onCreate,
   onDelete,
 }: {
-  plans: { id: string; name: string }[];
+  plans: GemPlan[];
   activePlanId: string | null;
   onSelect: (id: string | null) => void;
-  onCreate: (name: string) => void;
+  onCreate: (name: string, characterClass: PoeClass) => void;
   onDelete: (id: string) => void;
 }) {
   const [newPlanName, setNewPlanName] = useState("");
+  const [newPlanClass, setNewPlanClass] = useState<PoeClass>(POE_CLASSES[0]);
 
   function handleCreate() {
     if (!newPlanName.trim()) return;
-    onCreate(newPlanName.trim());
+    onCreate(newPlanName.trim(), newPlanClass);
     setNewPlanName("");
   }
 
@@ -129,7 +141,7 @@ function PlanSelector({
         <option value="">Select a plan…</option>
         {plans.map((plan) => (
           <option key={plan.id} value={plan.id}>
-            {plan.name}
+            {plan.name} ({plan.characterClass})
           </option>
         ))}
       </select>
@@ -138,6 +150,16 @@ function PlanSelector({
         value={newPlanName}
         onChange={(e) => setNewPlanName(e.currentTarget.value)}
       />
+      <select
+        value={newPlanClass}
+        onChange={(e) => setNewPlanClass(e.target.value as PoeClass)}
+      >
+        {POE_CLASSES.map((cls) => (
+          <option key={cls} value={cls}>
+            {cls}
+          </option>
+        ))}
+      </select>
       <button onClick={handleCreate}>Create Plan</button>
       {activePlanId && (
         <button onClick={() => onDelete(activePlanId)}>Delete Plan</button>
@@ -148,14 +170,16 @@ function PlanSelector({
 
 function QuickAdd({
   planId,
+  characterClass,
   onAdd,
 }: {
   planId: string;
+  characterClass: PoeClass;
   onAdd: (planId: string, entry: { gemName: string; act: number; source: GemSource }) => void;
 }) {
   const { data } = useReferenceData();
 
-  const [selectedQuestId, setSelectedQuestId] = useState("");
+  const [selectedQuestGem, setSelectedQuestGem] = useState("");
   const [selectedVendorId, setSelectedVendorId] = useState("");
   const [selectedVendorGem, setSelectedVendorGem] = useState("");
 
@@ -168,15 +192,28 @@ function QuickAdd({
 
   const vendorEntry = data?.vendorStock.find((v) => v.vendorId === selectedVendorId);
 
+  // Flatten quest rewards to one option per (quest, gem) pair for this
+  // class — a quest offers a *choice* of gems, not the whole list at once.
+  const questOptions =
+    data?.questRewards.flatMap((quest) =>
+      (quest.gemsByClass[characterClass] ?? []).map((gem) => ({
+        key: `${quest.id}::${gem}`,
+        act: quest.act,
+        questId: quest.id,
+        questName: quest.quest,
+        gem,
+      })),
+    ) ?? [];
+
   function addFromQuest() {
-    const quest = data?.questRewards.find((q) => q.id === selectedQuestId);
-    if (!quest) return;
+    const option = questOptions.find((o) => o.key === selectedQuestGem);
+    if (!option) return;
     onAdd(planId, {
-      gemName: quest.gem,
-      act: quest.act,
-      source: { type: "quest", label: quest.quest, questId: quest.id },
+      gemName: option.gem,
+      act: option.act,
+      source: { type: "quest", label: option.questName, questId: option.questId },
     });
-    setSelectedQuestId("");
+    setSelectedQuestGem("");
   }
 
   function addFromVendor() {
@@ -208,20 +245,20 @@ function QuickAdd({
     <div>
       <h2>Add gems</h2>
 
-      {data && data.questRewards.length > 0 && (
+      {questOptions.length > 0 && (
         <div className="row-buttons">
           <select
-            value={selectedQuestId}
-            onChange={(e) => setSelectedQuestId(e.target.value)}
+            value={selectedQuestGem}
+            onChange={(e) => setSelectedQuestGem(e.target.value)}
           >
             <option value="">Quest reward…</option>
-            {data.questRewards.map((quest) => (
-              <option key={quest.id} value={quest.id}>
-                Act {quest.act} — {quest.quest}: {quest.gem}
+            {questOptions.map((option) => (
+              <option key={option.key} value={option.key}>
+                Act {option.act} — {option.questName}: {option.gem}
               </option>
             ))}
           </select>
-          <button onClick={addFromQuest} disabled={!selectedQuestId}>
+          <button onClick={addFromQuest} disabled={!selectedQuestGem}>
             Add
           </button>
         </div>
@@ -249,7 +286,7 @@ function QuickAdd({
             disabled={!vendorEntry}
           >
             <option value="">Gem…</option>
-            {vendorEntry?.gems.map((gem) => (
+            {vendorEntry?.gemsByClass[characterClass]?.map((gem) => (
               <option key={gem} value={gem}>
                 {gem}
               </option>
