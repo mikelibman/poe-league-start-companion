@@ -1,6 +1,7 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 import { getModules } from "./moduleRegistry";
 import { useSettings } from "./SettingsContext";
+import { useUpdater } from "./UpdaterContext";
 
 export function AppShell() {
   const { disabledModules, loaded } = useSettings();
@@ -21,6 +22,7 @@ export function AppShell() {
             </li>
           ))}
         </ul>
+        <UpdateBanner />
       </nav>
       <main className="app-content">
         {loaded ? (
@@ -37,6 +39,29 @@ export function AppShell() {
           <p>Loading…</p>
         )}
       </main>
+    </div>
+  );
+}
+
+function UpdateBanner() {
+  const { updateReady, updateVersion, runActive, applyUpdate } = useUpdater();
+
+  if (!updateReady) return null;
+
+  return (
+    <div className="update-banner">
+      <p>Update {updateVersion} ready.</p>
+      <button
+        onClick={applyUpdate}
+        disabled={runActive}
+        title={
+          runActive
+            ? "Won't restart mid-run — finish or start a new run first"
+            : undefined
+        }
+      >
+        Restart to update
+      </button>
     </div>
   );
 }
