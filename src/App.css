@@ -114,6 +114,13 @@ td {
   width: 7em;
 }
 
+.regex-output {
+  width: 100%;
+  max-width: 40em;
+  font-family: ui-monospace, Consolas, monospace;
+  display: block;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;

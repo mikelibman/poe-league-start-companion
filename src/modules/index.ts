@@ -4,3 +4,4 @@ import "./dashboard/register";
 import "./settings/register";
 import "./timer/register";
 import "./gem-plan/register";
+import "./regex-builder/register";
