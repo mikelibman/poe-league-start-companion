@@ -7,6 +7,7 @@
 // that table.
 
 pub mod core;
+pub mod gem_plan;
 pub mod log_locale;
 pub mod log_watcher;
 pub mod reference_data;

@@ -2,6 +2,7 @@ mod modules;
 mod storage;
 
 use modules::core::{core_store_read, core_store_write};
+use modules::gem_plan::gemplan_parse_pob;
 use modules::log_watcher::{
     autostart, logwatcher_detect_path, logwatcher_get_path, logwatcher_set_path,
     logwatcher_start, logwatcher_stop, WatcherHandle,
@@ -28,6 +29,7 @@ pub fn run() {
             logwatcher_start,
             logwatcher_stop,
             refdata_load,
+            gemplan_parse_pob,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

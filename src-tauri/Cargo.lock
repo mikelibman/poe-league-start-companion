@@ -2620,6 +2620,9 @@ dependencies = [
 name = "poe-league-start-companion"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
+ "flate2",
+ "quick-xml",
  "reqwest 0.12.28",
  "serde",
  "serde_json",

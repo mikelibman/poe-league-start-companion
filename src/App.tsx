@@ -4,6 +4,7 @@ import { SettingsProvider } from "./core/SettingsContext";
 import { VendorSelectionProvider } from "./core/VendorSelectionContext";
 import { ReferenceDataProvider } from "./core/ReferenceDataContext";
 import { TimerProvider } from "./modules/timer/TimerContext";
+import { GemPlanProvider } from "./modules/gem-plan/GemPlanContext";
 import { AppShell } from "./core/AppShell";
 import "./App.css";
 
@@ -13,9 +14,11 @@ function App() {
       <ReferenceDataProvider>
         <VendorSelectionProvider>
           <TimerProvider>
-            <HashRouter>
-              <AppShell />
-            </HashRouter>
+            <GemPlanProvider>
+              <HashRouter>
+                <AppShell />
+              </HashRouter>
+            </GemPlanProvider>
           </TimerProvider>
         </VendorSelectionProvider>
       </ReferenceDataProvider>
