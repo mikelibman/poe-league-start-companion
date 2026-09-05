@@ -6,7 +6,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { loadPlans, savePlans, loadProgress, saveProgress } from "./store";
+import {
+  loadPlans,
+  savePlans,
+  loadProgress,
+  saveProgress,
+  loadGemCosts,
+  saveGemCosts,
+  type KnownGemCosts,
+} from "./store";
 import { useTimer } from "../timer/TimerContext";
 import type { CurrencyCost, GemPlan, GemPlanEntry } from "./types";
 import type { PoeClass } from "../../core/poeClasses";
@@ -58,36 +66,57 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
   const [activePlanId, setActivePlanIdState] = useState<string | null>(null);
   const [boughtEntryIds, setBoughtEntryIds] = useState<Set<string>>(new Set());
   const [takenQuestKeys, setTakenQuestKeys] = useState<Set<string>>(new Set());
+  const [knownGemCosts, setKnownGemCosts] = useState<KnownGemCosts>({});
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadPlans(), loadProgress()]).then(([plansData, progress]) => {
-      setPlans(plansData.plans);
-      setActivePlanIdState(plansData.activePlanId);
-      setBoughtEntryIds(new Set(progress.boughtEntryIds));
+    Promise.all([loadPlans(), loadProgress(), loadGemCosts()]).then(
+      ([plansData, progress, gemCosts]) => {
+        setActivePlanIdState(plansData.activePlanId);
+        setBoughtEntryIds(new Set(progress.boughtEntryIds));
+        setKnownGemCosts(gemCosts);
 
-      // Backfill: a plan saved before quest-taken tracking existed can
-      // already have entries sourced from a quest — treat those quests as
-      // already resolved rather than showing them as available again
-      // (which would invite adding duplicates of gems already in the plan).
-      const takenKeys = new Set(progress.takenQuestKeys ?? []);
-      for (const plan of plansData.plans) {
-        for (const entry of plan.entries) {
-          if (entry.source.type === "quest" && entry.source.questId) {
-            takenKeys.add(questKey(plan.id, entry.source.questId));
+        // Backfill: a plan saved before quest-taken tracking existed can
+        // already have entries sourced from a quest — treat those quests as
+        // already resolved rather than showing them as available again
+        // (which would invite adding duplicates of gems already in the plan).
+        const takenKeys = new Set(progress.takenQuestKeys ?? []);
+        for (const plan of plansData.plans) {
+          for (const entry of plan.entries) {
+            if (entry.source.type === "quest" && entry.source.questId) {
+              takenKeys.add(questKey(plan.id, entry.source.questId));
+            }
           }
         }
-      }
-      setTakenQuestKeys(takenKeys);
-      if (takenKeys.size !== (progress.takenQuestKeys ?? []).length) {
-        void saveProgress({
-          boughtEntryIds: progress.boughtEntryIds,
-          takenQuestKeys: [...takenKeys],
-        });
-      }
+        setTakenQuestKeys(takenKeys);
+        if (takenKeys.size !== (progress.takenQuestKeys ?? []).length) {
+          void saveProgress({
+            boughtEntryIds: progress.boughtEntryIds,
+            takenQuestKeys: [...takenKeys],
+          });
+        }
 
-      setLoaded(true);
-    });
+        // Backfill: an already-priced gem (learned from a previous plan,
+        // possibly in an earlier session) fills in any entry that doesn't
+        // have its own cost yet — a fixed per-gem price only needs to be
+        // entered once to apply everywhere.
+        let pricesApplied = false;
+        const pricedPlans = plansData.plans.map((plan) => ({
+          ...plan,
+          entries: plan.entries.map((entry) => {
+            if (entry.cost || !gemCosts[entry.gemName]) return entry;
+            pricesApplied = true;
+            return { ...entry, cost: gemCosts[entry.gemName] };
+          }),
+        }));
+        setPlans(pricedPlans);
+        if (pricesApplied) {
+          void savePlans({ plans: pricedPlans, activePlanId: plansData.activePlanId });
+        }
+
+        setLoaded(true);
+      },
+    );
   }, []);
 
   // "Bought" progress (and which quest rewards have been resolved) resets
@@ -149,12 +178,16 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
     updatePlan(planId, (plan) => ({ ...plan, characterClass }));
   }
 
+  function resolveCost(entry: NewGemPlanEntry): CurrencyCost | null {
+    return entry.cost ?? knownGemCosts[entry.gemName] ?? null;
+  }
+
   function addEntry(planId: string, entry: NewGemPlanEntry) {
     updatePlan(planId, (plan) => ({
       ...plan,
       entries: [
         ...plan.entries,
-        { ...entry, cost: entry.cost ?? null, id: crypto.randomUUID() },
+        { ...entry, cost: resolveCost(entry), id: crypto.randomUUID() },
       ],
     }));
   }
@@ -166,7 +199,7 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
         ...plan.entries,
         ...entries.map((entry) => ({
           ...entry,
-          cost: entry.cost ?? null,
+          cost: resolveCost(entry),
           id: crypto.randomUUID(),
         })),
       ],
@@ -180,11 +213,33 @@ export function GemPlanProvider({ children }: { children: ReactNode }) {
     }));
   }
 
+  // A fixed per-gem price (see D-note above) is worth teaching the shared
+  // map, and retroactively applying to any other un-priced entry for that
+  // same gem across every plan — not just this one — since it's the gem
+  // that has the price, not this particular plan's copy of it.
   function setEntryCost(planId: string, entryId: string, cost: CurrencyCost | null) {
-    updatePlan(planId, (plan) => ({
-      ...plan,
-      entries: plan.entries.map((e) => (e.id === entryId ? { ...e, cost } : e)),
+    const plan = plans.find((p) => p.id === planId);
+    const gemName = plan?.entries.find((e) => e.id === entryId)?.gemName;
+
+    const nextPlans = plans.map((p) => ({
+      ...p,
+      entries: p.entries.map((e) => {
+        if (e.id === entryId) return { ...e, cost };
+        if (cost && gemName && e.gemName === gemName && !e.cost) {
+          return { ...e, cost };
+        }
+        return e;
+      }),
     }));
+    persist(nextPlans, activePlanId);
+
+    if (cost && gemName) {
+      setKnownGemCosts((current) => {
+        const next = { ...current, [gemName]: cost };
+        void saveGemCosts(next);
+        return next;
+      });
+    }
   }
 
   // Buy-order/priority reordering — swaps with the neighboring entry.

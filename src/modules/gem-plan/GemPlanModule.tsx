@@ -166,10 +166,12 @@ export function GemPlanModule() {
   );
 }
 
-// Vendor gem prices scale with the gem's level and rise with each
-// purchase (confirmed against the wiki — there's no fixed lookup value),
-// so cost is a manual per-entry field: fill in what's actually seen
-// in-game, and totals below update automatically.
+// A vendor gem's price is fixed (doesn't scale with character level or
+// purchase count) but varies gem-to-gem — one might be a Scroll of
+// Wisdom, another an Orb of Chance — and isn't reference data the app
+// ships with, so it's entered manually the first time. Setting it here
+// teaches the shared per-gem price list (see GemPlanContext.setEntryCost),
+// so it auto-fills for this gem in every plan from then on.
 function CostEditor({
   cost,
   onChange,
@@ -246,10 +248,10 @@ function CostSummary({ entries }: { entries: GemPlanEntry[] }) {
     <div>
       <h2>Currency needed</h2>
       <p>
-        Vendor gem prices scale with the gem's level and rise with each
-        purchase, so there's no fixed amount to pre-fill — enter what you
-        actually see in-game in the Cost column above, and these totals
-        update automatically. Quest reward gems are free.
+        Each gem's price is fixed but varies gem-to-gem, so it's entered
+        manually the first time in the Cost column above — after that it's
+        remembered and auto-fills anywhere else that gem shows up. Quest
+        reward gems are free.
       </p>
       {acts.map((act) => (
         <div key={act}>
